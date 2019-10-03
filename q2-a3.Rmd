@@ -1,0 +1,202 @@
+---
+title: "q2"
+author: "Zexuan Fang"
+date: "03/10/2019"
+output: pdf_document
+---
+
+# Q2. 
+### (a) We firstly determined the decrement table, as shown in below, in which dependent decrement rates were calculated by using the multiple decrement rate formula with 2 decrements, our al_x, ad_d and ad_w columns are record of the number of people being either in-force in policy, dead or withdrew from the policy at the corresponding age, and our al_30 was set to be 100000 initially, and by multiply it by the respective q_w and q_d to obtain the ad_d and ad_w. 
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# Dcrement Table 
+q_w <- c(0.25, 0.2, 0.175, 0.15, rep(0.15,5), 1)
+q_d <- c(0.00043, 0.00042, 0.00041, 0.00040, 0.00041, 
+         0.00042, 0.00043, 0.00045, 0.00049, 0.00053)
+aq_w <- q_w*(1-0.5*q_d) #dependent withdrawal rate
+aq_d <- q_d*(1-0.5*q_w) #dependent mortality rate 
+al_x <- rep(0, 11)
+ad_d <- rep(0, 10)
+ad_w <- rep(0, 10)
+al_x[1] <- 100000
+ad_d[1] <- al_x[1]*aq_d[1]
+ad_w[1] <- al_x[1]*aq_w[1]
+
+for (i in 2:10) {
+  al_x[i] <- al_x[i-1] - ad_d[i-1]-ad_w[i-1]
+  ad_w[i] <- al_x[i]*aq_w[i]
+  ad_d[i] <- al_x[i]*aq_d[i]
+}
+premium.10.year <- rep(5000,10)
+
+#fees
+premium.fee <- premium.10.year * c(0.45, rep(0.01,9))
+buy.sell.margin <- 0.005
+asset.fee.charge <- 0.003
+
+#expense
+acquisition.expense <- 0.45*premium.10.year[1]
+maintenance.expense <- c(58, 58*(1.2^(1:9)))
+
+#profit test basis 
+unit.fund.earn <- 0.1
+non.uni.fund.earn <- 0.08
+valuation.v.2 <- (1.125^-(1:10))
+
+age <- c(30:39)
+cbind(age, q_w, q_d, aq_w, aq_d, al_x, ad_d, ad_w)
+
+```
+
+
+### Next, we calculate the future cashflows in our unit fund, results are as shown in below table. Invested premium was calculated by substracting buy-sell margin and premium-based fee from premium, and our value of units was computed by accruing the after-asset-fee sum of immediate previous year's unit value and the current yyear's invested premium by the unit fund intereest. 
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+#Future cashflow in Unit Fund 
+invested.premium.BoY <- premium.10.year - 
+  premium.fee - buy.sell.margin*(premium.10.year-premium.fee)
+
+value.of.units.EoY <- rep(0,10)
+value.of.units.EoY[1] <- invested.premium.BoY[1]*(1+unit.fund.earn)*
+                                           (1-asset.fee.charge)
+for (i in 2:10) {
+  value.of.units.EoY[i] <- (value.of.units.EoY[i-1] + 
+                              invested.premium.BoY[i])*
+                             (1+unit.fund.earn)*(1-asset.fee.charge)
+}
+
+cbind(age, invested.premium.BoY, value.of.units.EoY)
+```
+
+
+### Following, we calculated the expected amount of the cashflow we found in above, this is shown as below table. A probability of $\frac{al_{x}}{al_{30}}$ was applied to all the invested premium and value of units to generate their respective expected amount. Interest in unit fund was calculated by summing the expecte amount of current year invested and immediate previous year's unit value. Transfer to non-unit summing all the cashinflows such as invested premium and interest, and minus the increase on units value. 
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+#Expected cashflow in Unit Fund 
+expect.invested.premium <- c(invested.premium.BoY[1],
+                             invested.premium.BoY[2:10]*
+                               (al_x[2:10]/al_x[1]))
+
+expect.value.of.units.EoY <- value.of.units.EoY*(al_x[2:11]/al_x[1])
+
+
+interest.unit.fund <- rep(0,10)
+interest.unit.fund[1] <- expect.invested.premium[1]*unit.fund.earn
+for (i in 2:10) {
+  interest.unit.fund[i] <- unit.fund.earn*(expect.value.of.units.EoY[i-1]+
+                                             expect.invested.premium[i]) 
+}
+
+transfer.to.non.unit <- expect.invested.premium+interest.unit.fund+
+  c(0,expect.value.of.units.EoY[1:9])-expect.value.of.units.EoY
+
+cbind(age,expect.invested.premium, expect.value.of.units.EoY, 
+      interest.unit.fund, transfer.to.non.unit)
+```
+
+
+### Then we calculated the future cashflow in non-unit fund, as shown below, 
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+#future cashflow in non-unit fund 
+buy.sell.fee.BoY <- buy.sell.margin*(premium.10.year-premium.fee)
+
+expense.total.BoY <- c(acquisition.expense+maintenance.expense[1],
+                       maintenance.expense[2:10] )
+
+death.or.surrender.benefit.EoY <- value.of.units.EoY
+
+cbind(age, buy.sell.fee.BoY, expense.total.BoY, 
+      death.or.surrender.benefit.EoY)
+```
+
+### Following, we calculated the expected amount of the cashflow in non-unit fund, as shown in the table below. For all amount except for the interest amount, they were calculated by multiply the future cashflow in non-unit fund as per found above by their respective probability, i.e. probability of staying in-force, dead or withdraw from policy. Interest in non-unit fund was calculated by substracting all expected amount of death, surrender benefit as well as the expense from the sum of expected amount of premium and buy sell fee.  
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+#expected cashflow in non-unit fund 
+expect.premium.fee <- c(premium.fee[1],
+                        premium.fee[2:10]*(al_x[2:10]/al_x[1]))
+
+expect.buy.sell.fee <- c(buy.sell.fee.BoY[1], 
+                         buy.sell.fee.BoY[2:10]*(al_x[2:10]/al_x[1]))
+
+expect.expense.total <- c(expense.total.BoY[1],
+                          expense.total.BoY[2:10]*(al_x[2:10]/al_x[1]))
+
+expect.death.benefit <- death.or.surrender.benefit.EoY*(ad_d/al_x[1])
+
+
+expect.surrender.benefit <- death.or.surrender.benefit.EoY*(ad_w/al_x[1])
+
+
+interest.non.unit.fund <- non.uni.fund.earn*(expect.premium.fee+
+                                               expect.buy.sell.fee-
+                                               expect.expense.total)
+
+cbind(age, expect.premium.fee, expect.buy.sell.fee, expect.expense.total, 
+      expect.death.benefit, expect.surrender.benefit, interest.non.unit.fund, 
+      transfer.to.non.unit)
+
+```
+
+### Thus, we found our final profit signature and the expected present value of it at 12.5%, as shown in the below table. Profit signature was found by the difference between the expected amount of premium fee, buy sell fee, interest in non-unit and transfer to non unit, and expected amount of death benefit, surrender benefit and the expense.  
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+#profit signature 
+profit.signature.2 <- expect.premium.fee+expect.buy.sell.fee+
+  interest.non.unit.fund+transfer.to.non.unit-expect.expense.total-
+  expect.death.benefit-expect.surrender.benefit
+
+profit.signature.2
+EPV.profit.signature.2.at.v2 <- sum(profit.signature.2*valuation.v.2)
+
+EPV.2<- c(rep(0,9), EPV.profit.signature.2.at.v2)
+cbind(age, profit.signature.2, EPV.2)
+```
+
+## (b) We calcualted the changed policy value by firstly setting up a function for the 10th year's transfer, that is established on the below equation  
+$$
+E(premium fee)  + E(buy-sell) + Interest.NonUnift +E(IP) + 
+Transfer.from.Unit - E(DB) - E(SB) - E(expense)
+$$
+
+### Note that out of all the amounts included in above formula, only the transfer from unit at year 10 will be afftected by a change in year 9's policy value, since a such change will change the transfer amount from unit fund during year 9, which is directly linked to year 10's interests that contribute to year 10's transfer from unit. Thus, in our function we included a single variable - (p) that denotes the year 9's policy value, and it was incorporated in the expression for transfer from unit fund at year 10 as following 
+$$
+Transfer.from.Unit = interest_{unit.fund}\times [p\frac{al_{39}}{al_{30}}+E(IP_{10})]+p\frac{al_{39}}{al_{30}}
+$$
+
+### Thus, by using a uniroot() function to solve the above described one-dimensional equation, we found our changed policy value at year 9 to be $67319.02, which is a $3.713458 increase from what it was before, to achieve our zeroisation. 
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+year <- c(1:10)
+
+transfer.year.10.zeroised <- function(p){
+  expect.premium.fee[10]+expect.buy.sell.fee[10]+interest.non.unit.fund[10]+
+    expect.invested.premium[10]+unit.fund.earn*(p*(al_x[10]/al_x[1])+
+                                                  expect.invested.premium[10])+
+    p*(al_x[10]/al_x[1])-expect.expense.total[10]-expect.death.benefit[10]-
+    expect.surrender.benefit[10]
+}
+
+changed.policy.value.yr9 <- uniroot(transfer.year.10.zeroised, 
+                                    c(60000, 70000))$root
+policy.value.yr9.change.by <- changed.policy.value.yr9 - value.of.units.EoY[9]
+
+cbind(changed.policy.value.yr9, policy.value.yr9.change.by)
+```
+
+
+
+
+## (c). As shown in the table below, we found a decreased expected present value of transfer as a result of the zeorisation, in which it was found to be 34.66861, and it was 34.67393 before zeroisation. This is because zerosiation increased to the policy value at year 9, by 3.71, thus decreased the current year transfer to non-unit fund at year 9, by 0.69, at the mean time, which would subsequently decrease the profit signature at year 9 by 0.69, thus, resulting in a smaller present value.   
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+transfer.to.non.unit.modified.yr9 <- expect.invested.premium[9] +interest.unit.fund[9] +
+  expect.value.of.units.EoY[8] - changed.policy.value.yr9*(al_x[10]/al_x[1])
+
+profit.signature.2.year.9.modified <- expect.premium.fee[9]+
+  expect.buy.sell.fee[9]+
+  interest.non.unit.fund[9]+ transfer.to.non.unit.modified.yr9 -
+  expect.expense.total[9] -
+  expect.death.benefit[9] -
+  expect.surrender.benefit[9]
+
+zeroised.profit.signature.2 <- c(profit.signature.2[1:8], 
+                                 profit.signature.2.year.9.modified,0)
+
+EPV.zeroised.profit.signature.v2 <- sum(zeroised.profit.signature.2*valuation.v.2)
+
+cbind(EPV.profit.signature.2.at.v2, EPV.zeroised.profit.signature.v2)
+```
