@@ -1,0 +1,133 @@
+---
+title: "q1"
+author: "Zexuan Fang"
+date: "03/10/2019"
+output: pdf_document
+---
+
+# Q1. 
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+#Annuity Benefit inflation rate 
+si.inflation <- 0.0192308
+
+#Premium amount (one-off)
+premium <- 40250
+
+#Mortality from age 55 to 57
+q_x <- c(0.001046, 0.001199, 0.001375)
+
+#Initial expense 1
+exp_initial_1 <- 100
+
+#Initial expense 2
+exp_initial_2 <- 0.015
+
+#Annuity payment expense inflation
+exp_annuity_inflation <- 0.05
+
+#Earned interest rate
+earned.int <- 0.08
+
+#Risk discount rate 
+risk.v <- (1+0.12)^(-1) 
+
+#Valuation interest rate 
+valuation.v <- (1+0.06)^(-1)
+
+#A_{56:3}
+endow_56_3 <- 0.889132
+
+#A_{57:2}
+endow_57_2 <- 0.924607
+```
+
+### (a). To calculate the profit signature, firstly, we calculated all the future cashflows to be generated under this policy, as shown in the below table, where annuity.benefit and expenses were calculated by accounting for their respective infaltion rate and policy value was computed using a varying insurance formula as well as the tabulated endowment assurance numbers given. 
+```{r, echo=FALSE}
+#1. Future Cashflow 
+#(i) Future annuity benefit 
+annuity.benefit <-  rep(15000,3)
+annuity.benefit[2:3] <- annuity.benefit[2:3]*c((1+si.inflation),(1+si.inflation)^2)
+
+
+#(ii) Future expenses 
+initial.expense <- c(exp_initial_1 + exp_initial_2*premium,0,0)
+annuity.payment.expense <- c(10, c(10,10)*(1+exp_annuity_inflation)^(1:2))
+
+#(iv) Policy Value
+discount.factor.valuation <- c(valuation.v^c(1:3))
+j <- ((1+0.06)/(1+si.inflation))-1
+v_j <- (1+j)^-1
+policy.value <- rep(0,3)
+policy.value[2] <- annuity.benefit[1]*((v_j - endow_56_3)/(v_j*j))
+policy.value[3] <- annuity.benefit[2]*((v_j - endow_57_2)/(v_j*j))
+
+
+#2. Expected Cashflow 
+#(i) Expected annuity benefit 
+expect.benefit <- annuity.benefit*c(1-q_x[1], 
+                                    (1-q_x[1])*(1-q_x[2]), 
+                                    (1-q_x[1])*(1-q_x[2])*(1-q_x[3]))
+
+#(ii) Expect expenses 
+expect.annuity.payment.expense <- annuity.payment.expense*c(1-q_x[1],
+                                               (1-q_x[1])*(1-q_x[2]), 
+                                               (1-q_x[1])*(1-q_x[2])*(1-q_x[3]))
+
+
+#(iv) Expect policy value 
+expect.policy.value <- policy.value*c(0, 1-q_x[1], (1-q_x[1])*(1-q_x[2]))
+expect.policy.value.EoY <- c(expect.policy.value[2], expect.policy.value[3],0)
+
+#(iii) Earned Interest 
+earned.interest  <-  rep(0,3)
+earned.interest[1] <- earned.int*(premium-initial.expense[1])
+earned.interest[2:3] <- earned.int* expect.policy.value[2:3]
+
+
+#3. Profit Signature 
+profit.signature <- c(premium, 0, 0) + earned.interest - 
+  initial.expense-expect.annuity.payment.expense - 
+  expect.benefit + expect.policy.value - expect.policy.value.EoY
+
+
+#(ii) 
+#ENPV 0f profit signature @ risk rate
+discount.factor.risk <- c(risk.v^c(1:3))
+EPV.profit.signature.risk <- sum(discount.factor.risk*profit.signature)
+
+#profit margin 
+profit.margib <- EPV.profit.signature.risk/premium # 35% loss 
+
+cbind(annuity.benefit, initial.expense, 
+      annuity.payment.expense, policy.value)
+```
+
+
+
+### Next, we calculated the expected amount of all the future cashflows, additionally we also computed the interests to be earned in our profile, a detailed table as given below. 
+```{r, echo=FALSE}
+cbind(expect.benefit, expect.annuity.payment.expense, 
+      expect.policy.value.EoY, earned.interest)
+```
+
+## Thus, from the above results, we calculated the profile of our profit signature for this policy by substracting all expenses and payments to be paid, such as annuity payment expense, initial expense, current year policy valueas, from the incomes such as premium and interes. As shown below well as its expected present value.
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+EPV <- c(0,0,EPV.profit.signature.risk)
+cbind(profit.signature, EPV)
+```
+
+
+ 
+## (b). 
+### To calculate the irr, we first constructed a net present value function with one parameter which is an interest rate, subsequently, we used uniroot() function to solve this one-dimwnsional npv function, which returned a result of 0.50278. This is an internal rate of return of approximately 50%, and the reason that it should be this high is that the projected cashflow in our preofit signature at later years is quite sizeable, in other words, this policy contract is potentially very profitable with large profit to be released after the inital capital injection. 
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+#net present value fundtion
+yield.on.transfer <- function(i){
+  sum(profit.signature/(1+i)^(1:3))
+}
+
+#internal rate of return 
+irr <- uniroot(yield.on.transfer,c(0,1))$root
+cbind(irr)
+```
