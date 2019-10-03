@@ -1,0 +1,123 @@
+---
+title: "q3"
+author: "Zexuan Fang"
+date: "03/10/2019"
+output: pdf_document
+---
+
+# Q3. 
+## Yield on transfers for profit signature in Q(2)-a was found to be 0.473827, thus 47%. 
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+yield.on.transfer.2 <- function(i){
+  sum(profit.signature.2/(1+i)^(1:10))
+}
+irr.2 <- uniroot(yield.on.transfer.2, c(0,1))$root
+cbind(irr.2)
+```
+
+### To calculate the profit signature, expected present value of transfer and the yield on transfer for this policy, we started by firstly determining the changes to fees and rates resulting from the setting of policy, as shown below table, 
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+#changes resulting from inclusion of insurance cover
+insurance.cover <- 20000 
+insurance.charge <- 1.2*(q_d) 
+new.maintenance.expense <- c(75, 75*1.25^(1:9))
+
+#expect insurance charge.BoY
+expect.insurance.charge <- c(insurance.cover*insurance.charge[1],
+                             insurance.cover*insurance.charge[2:10]*(al_x[2:10]/al_x[1]))
+
+#new total expense.BoY
+new.expense.total <- c(acquisition.expense+new.maintenance.expense[1],
+                       new.maintenance.expense[2:10] )
+ 
+new.expect.expense.total <- c(new.expense.total[1], 
+                              new.expense.total[2:10]*(al_x[2:10]/al_x[1]))
+
+insurance.charge.fee <- insurance.cover*insurance.charge
+cbind(insurance.cover, insurance.charge.fee, new.maintenance.expense,
+      new.expense.total, new.expect.expense.total)
+```
+
+### Thus, resulting from the above fees change, we calculated the remaining new amounts for various other columns, which include some from the unit fund such as buy sell margin fees, investe premium, value of units, transfers to non-unit fund, and others from non-unit fund such as death benefit, surrender benefit, interest on non-unit fund. Amounts are summarised in the below table. 
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+#new buy sell margin fee 
+new.buy.sell.fee <- buy.sell.margin*(premium.10.year-premium.fee)
+#new invested premium.BoY
+new.invested.premium <- premium.10.year - 
+  premium.fee - new.buy.sell.fee-insurance.cover*insurance.charge
+
+
+new.expect.invested.premium <- c(new.invested.premium[1],
+                                 new.invested.premium[2:10]*(al_x[2:10]/al_x[1]))
+
+#new value of units.EoY
+new.value.of.units <- rep(0, 10)
+new.value.of.units[1] <- new.invested.premium[1]*(1+unit.fund.earn)*(1-asset.fee.charge)
+for (i in 2:10) {
+  new.value.of.units[i] <- (new.value.of.units[i-1]+
+                              new.invested.premium[i])*(1+unit.fund.earn)*(1-asset.fee.charge)
+}
+
+new.expect.value.of.units <- new.value.of.units*(al_x[2:11]/al_x[1])
+
+#adjusted death benefit.EoY
+new.death.benefit <- rep(insurance.cover,10) + new.value.of.units
+
+new.expect.death.benefit <- new.death.benefit*(ad_d/al_x[1])
+
+#new surrender benefit 
+new.surrender.benefit <- new.value.of.units
+
+new.expect.surrender.benefit <- new.surrender.benefit*(ad_w/al_x[1])
+
+#new interest in unit fund.EoY
+new.interest.unit.fund <- rep(0,10)
+new.interest.unit.fund[1] <- new.expect.invested.premium[1]*unit.fund.earn
+for (i in 2:10) {
+  new.interest.unit.fund[i] <- unit.fund.earn*(new.expect.value.of.units[i-1]+
+                                                 new.expect.invested.premium[i])
+}
+
+#new transfers to non-unit.EoY
+new.transfer.to.non.unit <- new.expect.invested.premium + new.interest.unit.fund +
+  c(0, new.expect.value.of.units[1:9]) - new.expect.value.of.units
+
+#new interest on non-unit.EoY
+new.interest.non.unit.fund <- non.uni.fund.earn*(expect.premium.fee+
+                                               expect.buy.sell.fee +
+                                              expect.insurance.charge-
+                                              new.expect.expense.total)
+
+#new expect buy-sell fee
+new.expect.buy.sell.fee <- new.buy.sell.fee*(al_x[1:10]/al_x[1])
+
+cbind(new.buy.sell.fee, new.invested.premium, new.value.of.units, 
+      new.transfer.to.non.unit, new.death.benefit, new.surrender.benefit,
+      new.expect.buy.sell.fee, new.expect.invested.premium, new.expect.value.of.units, 
+      new.expect.death.benefit, new.expect.surrender.benefit)
+
+```
+
+
+### Thus, from the above values, we calculated the required values as shown in the below table. 
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+#new profit signature 
+new.profit.signature <- expect.premium.fee + new.expect.buy.sell.fee +
+  expect.insurance.charge +new.interest.non.unit.fund + new.transfer.to.non.unit -
+  new.expect.expense.total - new.expect.death.benefit - new.expect.surrender.benefit
+
+
+yield.on.transfer.3 <- function(i){
+  sum(new.profit.signature/(1+i)^(1:10))
+}
+
+irr3 <- uniroot(yield.on.transfer.3,c(-2, 1))$root
+
+irr.3 <- c(rep(0,9), irr3)
+
+EPV.profit.signature.3 <- sum(new.profit.signature*valuation.v.2)
+
+EPV.3 <- c(rep(0,9), EPV.profit.signature.3)
+
+cbind(new.profit.signature, EPV.3, irr.3)
+```
